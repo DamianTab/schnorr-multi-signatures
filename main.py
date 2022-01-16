@@ -12,12 +12,15 @@ lower_bound = 2
 upper_bound = 20
 
 
-# cyclic group (Fq,*) based on generating two prime numbers as p = 2q+1 where p and 1 are primes
+# cyclic group (Fq,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
 def gen_cyclic_group():
     # prime numbers
     q = sympy.randprime(lower_bound, upper_bound)
     p = 2 * q + 1
-    print("q: ", q, " p: ", p)
+    while not sympy.isprime(p):
+        q = sympy.randprime(lower_bound, upper_bound)
+        p = 2 * q + 1
+    print("Cyclic group generation - q: ", q, " p: ", p)
 
     # Zp group of integers Z_p*
     zp = [x for x in range(p)]
@@ -29,7 +32,7 @@ def gen_cyclic_group():
     for integer in zp:
         potential_element = integer ** 2 % p
         group.append(potential_element)
-    return list(set(group))
+    return list(set(group)), p
 
 
 if __name__ == "__main__":
@@ -38,10 +41,13 @@ if __name__ == "__main__":
         message = str(sys.argv[1])
 
     # creating cyclic group
-    cyclic_group = gen_cyclic_group()
-    # prime number p
+    cyclic_group, modulo = gen_cyclic_group()
+    # prime number p (prime order)
     p = len(cyclic_group)
-    # random number from cyclic group
-    r = random.choice(cyclic_group)
-    generator = 0
-    print("p: ", p, "generator: ", generator, " random number: ", r, "group: ", cyclic_group)
+    # Every element from prime order cyclic group exclusiv 1 is generator
+    generator = 1
+    while generator == 1:
+        generator = random.choice(cyclic_group)
+    # random number from (Fq,*) group
+    r = random.randrange(1, modulo)
+    print(f"generator: {generator}\t modulo: {modulo}\t random number: {r}\t group: {cyclic_group}\t p: {p}\t")
