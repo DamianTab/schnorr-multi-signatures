@@ -1,3 +1,4 @@
+import hashlib
 import random
 import sys
 from random import SystemRandom  # cryptographic random byte generator
@@ -36,18 +37,51 @@ def gen_cyclic_group():
 
 
 if __name__ == "__main__":
+
     if len(sys.argv) > 1:
         # reading message
         message = str(sys.argv[1])
 
     # creating cyclic group
-    cyclic_group, modulo = gen_cyclic_group()
-    # prime number p (prime order)
-    p = len(cyclic_group)
+    cyclic_group, p = gen_cyclic_group()
     # Every element from prime order cyclic group exclusiv 1 is generator
     generator = 1
     while generator == 1:
         generator = random.choice(cyclic_group)
+
+    print(f"generator: {generator}\t group: {cyclic_group}\t p: {p}\t")
+
+    # private key
+    x = random.randrange(1, p)
+    # public key
+    X = pow(generator, x, p)
+    print(f"X: {X}")
+
+    ### Sending message
     # random number from (Fq,*) group
-    r = random.randrange(1, modulo)
-    print(f"generator: {generator}\t modulo: {modulo}\t random number: {r}\t group: {cyclic_group}\t p: {p}\t")
+    r = random.randrange(1, p)
+    print(f"random number: {r}\t")
+    R = pow(generator, r, p)
+
+    hash = hashlib.sha256()
+    hash.update(X.to_bytes(4, byteorder='big'))
+    hash.update(R.to_bytes(4, byteorder='big'))
+    hash.update(message.encode('utf-8'))
+    # For hexadecimal use hexdigest
+    c = hash.digest()
+    # c = hash.hexdigest()
+    # The signature is R and s -> (R,s)
+    c_int = int.from_bytes(c, 'big')
+    s = r + pow(c_int, x, p)
+    print(f"s: {s}")
+
+    ### Verification
+
+    left_side = pow(generator, s, p)
+    print(f"leftside= {left_side}")
+    print(f"X= {X}")
+    print(f"c_int= {c_int}")
+    print(f"pow(X, c_int, p)= {pow(X, c_int, p)}")
+    right_side = R * pow(X, c_int, p)
+
+    print(f"leftside= {left_side} and rightside= {right_side} is equals?: {left_side == right_side}")
