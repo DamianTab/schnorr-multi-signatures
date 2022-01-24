@@ -13,7 +13,7 @@ lower_bound = 100
 upper_bound = 200
 
 
-# cyclic subgroup (Fq,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
+# cyclic prime order subgroup (Fq,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
 def gen_cyclic_prime_subgroup():
     # prime numbers
     q = sympy.randprime(lower_bound, upper_bound)
