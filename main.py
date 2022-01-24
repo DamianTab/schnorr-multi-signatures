@@ -9,12 +9,12 @@ rand = SystemRandom()  # create strong random number generator
 
 # variables
 message = "Hello W0rld";
-lower_bound = 2
-upper_bound = 20
+lower_bound = 100
+upper_bound = 200
 
 
-# cyclic group (Fq,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
-def gen_cyclic_group():
+# cyclic subgroup (Fq,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
+def gen_cyclic_prime_subgroup():
     # prime numbers
     q = sympy.randprime(lower_bound, upper_bound)
     p = 2 * q + 1
@@ -31,7 +31,7 @@ def gen_cyclic_group():
     # find all elements in cyclic Zq with prime order q group:
     group = []
     for integer in zp:
-        potential_element = integer ** 2 % p
+        potential_element = pow(integer, 2, p)
         group.append(potential_element)
     return list(set(group)), p
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         message = str(sys.argv[1])
 
     # creating cyclic group
-    cyclic_group, p = gen_cyclic_group()
+    cyclic_group, p = gen_cyclic_prime_subgroup()
     # Every element from prime order cyclic group exclusiv 1 is generator
     generator = 1
     while generator == 1:
@@ -52,36 +52,35 @@ if __name__ == "__main__":
     print(f"generator: {generator}\t group: {cyclic_group}\t p: {p}\t")
 
     # private key
-    x = random.randrange(1, p)
+    x = random.choice(cyclic_group)
+    print(f"x: {x}")
     # public key
     X = pow(generator, x, p)
     print(f"X: {X}")
 
     ### Sending message
-    # random number from (Fq,*) group
-    r = random.randrange(1, p)
+    # random number from cyclic group
+    r = random.choice(cyclic_group)
     print(f"random number: {r}\t")
     R = pow(generator, r, p)
+    print(f"R: {R}\t")
 
     hash = hashlib.sha256()
     hash.update(X.to_bytes(4, byteorder='big'))
     hash.update(R.to_bytes(4, byteorder='big'))
     hash.update(message.encode('utf-8'))
     # For hexadecimal use hexdigest
-    c = hash.digest()
-    # c = hash.hexdigest()
+    c_hash = hash.digest()
     # The signature is R and s -> (R,s)
-    c_int = int.from_bytes(c, 'big')
-    s = r + pow(c_int, x, p)
+    c = int.from_bytes(c_hash, 'big')
+    print(f"c= {c}")
+    s = r + c * x
     print(f"s: {s}")
 
     ### Verification
-
     left_side = pow(generator, s, p)
     print(f"leftside= {left_side}")
-    print(f"X= {X}")
-    print(f"c_int= {c_int}")
-    print(f"pow(X, c_int, p)= {pow(X, c_int, p)}")
-    right_side = R * pow(X, c_int, p)
-
-    print(f"leftside= {left_side} and rightside= {right_side} is equals?: {left_side == right_side}")
+    print(f"pow(X, c, p)= {pow(X, c, p)}")
+    right_side = (R * pow(X, c, p)) % p
+    # leftside pow(generator, s, p); rightside R * pow(X, c, p)
+    print(f"leftside  = {left_side} and rightside = {right_side} is equals?: {left_side == right_side}")
