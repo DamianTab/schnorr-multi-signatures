@@ -67,7 +67,7 @@ class Signature(ABC):
         return self.public_key
 
     def compute_challenge(self, message, X, R):
-        hash = hashlib.sha256()
+        hash = hashlib.new(self.hash_name)
         hash.update(X.to_bytes(4, byteorder='big'))
         hash.update(R.to_bytes(4, byteorder='big'))
         hash.update(message.encode('utf-8'))
@@ -117,7 +117,6 @@ class SchnorrSignature(Signature):
 
 
 if __name__ == "__main__":
-
     if len(sys.argv) > 1:
         # reading message
         message_content = str(sys.argv[1])
