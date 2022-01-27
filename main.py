@@ -12,8 +12,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 
 # variables
 message_content = "Hello W0rld";
-prime_number_lower_bound = 10
-prime_number_upper_bound = 20
+prime_number_lower_bound = 5
+prime_number_upper_bound = 10
 
 
 def log(phase, subject, message, *args):
@@ -154,6 +154,7 @@ class MaxwellSigner(Signer):
         for key in L:
             ai = hash_data(self.cyclic_group.hash_name, str(L), key)
             data.X_aggregated *= pow(key, ai, self.cyclic_group.p)
+
     #         todo byc moze modulo
 
     # Round 2
@@ -175,9 +176,9 @@ class MaxwellSigner(Signer):
         for ti, Ri in zip(ti_list, Ri_list):
             hash_Ri = hash_data(cyclic_group.hash_name, Ri)
             if ti != hash_Ri:
-                raise ValueError("Received hash ti: %i is diffrent from calculated: %i for number Ri: %i", ti, hash_Ri, Ri)
+                raise ValueError("Received hash ti: %i is diffrent from calculated: %i for number Ri: %i", ti, hash_Ri,
+                                 Ri)
         log("Signature", self.object_name, "Committed values are correct.")
-
 
     # Round 3
     def calculate_individual_signature(self, data, Ri_list, message):
@@ -186,16 +187,16 @@ class MaxwellSigner(Signer):
             aggregated_R *= Ri
         c = self.compute_challenge(data.X_aggregated, aggregated_R, message)
         # si = (data.ri + c * data.ai * self.private_key) % self.cyclic_group.p
+        # todo ask why here I cannot do modulo p
         si = data.ri + c * data.ai * self.private_key
         return aggregated_R, si
-
 
     # Round 3
     # The signature is R and s -> (R,s)
     def sign_message(self, R, si_list):
         # todo ask why here I cannot do modulo p
-        # s = sum(si_list) % self.cyclic_group.p
-        s = sum(si_list)
+        s = sum(si_list) % self.cyclic_group.p
+        # s = sum(si_list)
         return R, s
 
     def verify_message(self, message, L, R, s):
@@ -204,10 +205,10 @@ class MaxwellSigner(Signer):
             ai = hash_data(self.cyclic_group.hash_name, str(L), key)
             X_aggregated *= pow(key, ai, self.cyclic_group.p)
         c = self.compute_challenge(X_aggregated, R, message)
+
+        log("Test", self.object_name, "To jest s: %i", s)
         left_side = pow(cyclic_group.generator, s, cyclic_group.p)
         right_side = (R * pow(X_aggregated, c, cyclic_group.p)) % cyclic_group.p
-        # right_side = (R * pow(X_aggregated, c% cyclic_group.p, cyclic_group.p)) % cyclic_group.p
-
         # leftside pow(generator, s, p); rightside (R * pow(X, c, p) )  mod p
         log("Verification", self.object_name, "g^s mod p  = %i \t|\t R*X^c mod p = %i \t|\t is equals?: %s", left_side,
             right_side, left_side == right_side)
