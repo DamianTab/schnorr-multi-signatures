@@ -15,12 +15,17 @@ message_content = "Hello W0rld";
 lower_bound = 100
 upper_bound = 200
 
+#todo we should know the real parameter size like p, q, message size, signature time, verification time, overall runtime
+# todo how bitcoin works with multisignature, generally examples
+# todo maybe security
 
 class CyclicGroup:
     def __init__(self):
         self.p = 0
         self.elements = []
         self.generator = 0
+    #     todo move hash function
+
 
     # cyclic prime order subgroup (Fq,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
     def generate_prime_order_subgroup(self):
@@ -132,6 +137,9 @@ if __name__ == "__main__":
 
     sig2 = SchnorrSignature(cyclic_group)
     sig2.generate_keys()
+
+    sig3 = SchnorrSignature(cyclic_group)
+    sig3.generate_keys()
 
     # Signature
     signers = []
