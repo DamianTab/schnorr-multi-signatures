@@ -66,7 +66,7 @@ class Signer(ABC):
     signers_number = 0
 
     def __init__(self, cyclic_group):
-        self.signers_number += 1
+        Signer.signers_number += 1
         self.object_name = "Signer-" + str(self.signers_number)
         self.cyclic_group = cyclic_group
         self.private_key = 0
@@ -85,7 +85,7 @@ class Signer(ABC):
         hash.update(message.encode('utf-8'))
         c_hash = hash.digest()
         c = int.from_bytes(c_hash, 'big')
-        log("Signature/Verification", self.object_name, "c= %i", c)
+        log("---", self.object_name, "c= %i", c)
         return c
 
     @abstractmethod
