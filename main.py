@@ -69,6 +69,8 @@ class CyclicGroup:
         while generator == 1:
             generator = random.choice(self.elements)
         self.generator = generator
+        #todo delete it
+        print([pow(self.generator, i, self.p) for i in range(1, self.p)])
         log("Setup", self.object_name, "generator: %s\t p: %s\t\t group: %s\t", self.generator, self.p, self.elements)
 
 
@@ -154,8 +156,6 @@ class MaxwellSigner(Signer):
         for key in L:
             ai = hash_data(self.cyclic_group.hash_name, str(L), key)
             data.X_aggregated *= pow(key, ai, self.cyclic_group.p)
-
-    #         todo byc moze modulo
 
     # Round 2
     def send_hashed_random_value(self, data):
