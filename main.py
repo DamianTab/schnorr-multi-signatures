@@ -11,9 +11,11 @@ rand = SystemRandom()  # create strong random number generator
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %(message)s')
 
 # variables
-message_content = "Hello W0rld";
-prime_number_lower_bound = 5
-prime_number_upper_bound = 10
+message_content = "Hello W0rld"
+prime_number_lower_bound = 10
+prime_number_upper_bound = 20
+# todo delete if unecessary
+random_exponent_upper_bound = 1000
 
 
 def log(phase, subject, message, *args):
@@ -24,7 +26,7 @@ def hash_data(hash_name, *args):
     hash = hashlib.new(hash_name)
     for arg in args:
         if isinstance(arg, int):
-            hash.update(arg.to_bytes(4, byteorder='big'))
+            hash.update(arg.to_bytes(24, byteorder='big'))
         else:
             hash.update(arg.encode('utf-8'))
     return int.from_bytes(hash.digest(), 'big')
@@ -38,26 +40,27 @@ class CyclicGroup:
     def __init__(self):
         self.object_name = "Schnorr cyclic group"
         self.p = 0
+        self.q = 0
         self.elements = []
         self.generator = 0
         self.hash_name = "sha256"
 
-    # cyclic prime order subgroup (Fq,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
+    # cyclic prime order q subgroup (Zq,*) from group (Zp,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
     def generate_prime_order_subgroup(self):
         # prime numbers
-        q = sympy.randprime(prime_number_lower_bound, prime_number_upper_bound)
-        self.p = 2 * q + 1
+        self.q = sympy.randprime(prime_number_lower_bound, prime_number_upper_bound)
+        self.p = 2 * self.q + 1
         while not sympy.isprime(self.p):
-            q = sympy.randprime(prime_number_lower_bound, prime_number_upper_bound)
-            self.p = 2 * q + 1
-        log("Setup", self.object_name, "Cyclic group generation - q: %i, p: %i", q, self.p)
+            self.q = sympy.randprime(prime_number_lower_bound, prime_number_upper_bound)
+            self.p = 2 * self.q + 1
+        log("Setup", self.object_name, "Cyclic group generation - self.q: %i, p: %i", self.q, self.p)
 
         # Zp group of integers Z_p*
         zp = [x for x in range(self.p)]
         # group without 0
         zp = zp[1:]
 
-        # find all elements in cyclic Zq with prime order q group:
+        # find all elements in cyclic Zq with prime order self.q group:
         group = []
         for integer in zp:
             potential_element = pow(integer, 2, self.p)
@@ -71,7 +74,7 @@ class CyclicGroup:
         self.generator = generator
         #todo delete it
         print([pow(self.generator, i, self.p) for i in range(1, self.p)])
-        log("Setup", self.object_name, "generator: %s\t p: %s\t\t group: %s\t", self.generator, self.p, self.elements)
+        log("Setup", self.object_name, "generator: %s\t p: %s\t\t group: %s\t", self.generator, self.p, self.elements[:25])
 
 
 class Signer(ABC):
@@ -85,7 +88,11 @@ class Signer(ABC):
         self.public_key = 0
 
     def generate_keys(self):
-        self.private_key = random.choice(cyclic_group.elements)
+        # todo ask why here we take from schnorr subgroup and not from Zp
+        # todo decide how to pick random
+        # self.private_key = random.randrange(int(random_exponent_upper_bound/2), random_exponent_upper_bound)
+        self.private_key = random.randrange(0, self.cyclic_group.p)
+        # self.private_key = random.randrange(0, self.cyclic_group.q)
         self.public_key = pow(cyclic_group.generator, self.private_key, cyclic_group.p)
         log("Key generation", self.object_name, "private key: %s, public key: %s", self.private_key, self.public_key)
         return self.public_key
@@ -159,7 +166,10 @@ class MaxwellSigner(Signer):
 
     # Round 2
     def send_hashed_random_value(self, data):
-        ri = random.choice(cyclic_group.elements)
+        # todo decide how to pick random
+        # ri = random.randrange(int(random_exponent_upper_bound/2), random_exponent_upper_bound)
+        ri = random.randrange(0, self.cyclic_group.p)
+        # ri = random.randrange(0, self.cyclic_group.q)
         Ri = pow(cyclic_group.generator, ri, cyclic_group.p)
         hash_R = hash_data(cyclic_group.hash_name, Ri)
 
@@ -186,27 +196,29 @@ class MaxwellSigner(Signer):
         for Ri in Ri_list:
             aggregated_R *= Ri
         c = self.compute_challenge(data.X_aggregated, aggregated_R, message)
-        # si = (data.ri + c * data.ai * self.private_key) % self.cyclic_group.p
         # todo ask why here I cannot do modulo p
-        si = data.ri + c * data.ai * self.private_key
+        si = (data.ri + c * data.ai * self.private_key) % self.cyclic_group.q
+        # si = data.ri + c * data.ai * self.private_key
+        log("LOGGGG", self.object_name, "si: %i", si)
         return aggregated_R, si
 
     # Round 3
     # The signature is R and s -> (R,s)
     def sign_message(self, R, si_list):
         # todo ask why here I cannot do modulo p
-        s = sum(si_list) % self.cyclic_group.p
+        s = sum(si_list) % self.cyclic_group.q
         # s = sum(si_list)
         return R, s
 
     def verify_message(self, message, L, R, s):
+        log("Verification", self.object_name, "Starting verification --------")
         X_aggregated = 1
         for key in L:
             ai = hash_data(self.cyclic_group.hash_name, str(L), key)
             X_aggregated *= pow(key, ai, self.cyclic_group.p)
         c = self.compute_challenge(X_aggregated, R, message)
 
-        log("Test", self.object_name, "To jest s: %i", s)
+        log("Verification", self.object_name, "This is value of final s: %i", s)
         left_side = pow(cyclic_group.generator, s, cyclic_group.p)
         right_side = (R * pow(X_aggregated, c, cyclic_group.p)) % cyclic_group.p
         # leftside pow(generator, s, p); rightside (R * pow(X, c, p) )  mod p
@@ -229,7 +241,7 @@ if __name__ == "__main__":
     users = []
     # List of signers' public keys
     L = []
-    for i in range(3):
+    for i in range(5):
         signer = MaxwellSigner(cyclic_group)
         X = signer.generate_keys()
         users.append(signer)
@@ -241,6 +253,7 @@ if __name__ == "__main__":
     signers_data = []
 
     # Round 1
+    log("Signature", "All signers", "Round 1 started ...")
     for signer in users[1:]:
         data = SignerData()
         signers_data.append(data)
@@ -248,6 +261,7 @@ if __name__ == "__main__":
     log("Signature", "All signers", "Round 1 finished - calculated aggregated public key.")
 
     # Round 2
+    log("Signature", "All signers", "Round 2 started ...")
     ti_list = []
     for data, signer in zip(signers_data, users[1:]):
         ti = signer.send_hashed_random_value(data)
@@ -262,8 +276,10 @@ if __name__ == "__main__":
 
     for signer in users[1:]:
         signer.verify_committed_values(ti_list, Ri_list)
+    log("Signature", "All signers", "Round 2 finished - All committed values are correct")
 
     # Round 3
+    log("Signature", "All signers", "Round 3 started ...")
     si_list = []
     R, s = 0, 0
     for data, signer in zip(signers_data, users[1:]):
@@ -271,9 +287,11 @@ if __name__ == "__main__":
         si_list.append(si)
 
     # We can take signature from any signer (R, s)
+    # R, s = users[1].sign_message(R, si_list)
     for signer in users[1:]:
         R, s = signer.sign_message(R, si_list)
-    # R, s = users[1].sign_message(R, si_list)
+    log("Signature", "All signers", "Round 3 finished - Signature generated correctly")
+
 
     ### Verification
     result = users[0].verify_message(message_content, L, R, s)
