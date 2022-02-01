@@ -12,8 +12,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 
 # variables
 message_content = "Hello W0rld"
-prime_number_lower_bound = 10
-prime_number_upper_bound = 20
+prime_number_upper_bound = 10
 # todo delete if unecessary
 random_exponent_upper_bound = 1000
 
@@ -48,10 +47,10 @@ class CyclicGroup:
     # cyclic prime order q subgroup (Zq,*) from group (Zp,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
     def generate_prime_order_subgroup(self):
         # prime numbers
-        self.q = sympy.randprime(prime_number_lower_bound, prime_number_upper_bound)
+        self.q = sympy.randprime(int(prime_number_upper_bound/2), prime_number_upper_bound)
         self.p = 2 * self.q + 1
         while not sympy.isprime(self.p):
-            self.q = sympy.randprime(prime_number_lower_bound, prime_number_upper_bound)
+            self.q = sympy.randprime(int(prime_number_upper_bound/2), prime_number_upper_bound)
             self.p = 2 * self.q + 1
         log("Setup", self.object_name, "Cyclic group generation - self.q: %i, p: %i", self.q, self.p)
 
@@ -72,8 +71,6 @@ class CyclicGroup:
         while generator == 1:
             generator = random.choice(self.elements)
         self.generator = generator
-        #todo delete it
-        print([pow(self.generator, i, self.p) for i in range(1, self.p)])
         log("Setup", self.object_name, "generator: %s\t p: %s\t\t group: %s\t", self.generator, self.p, self.elements[:25])
 
 
@@ -88,7 +85,6 @@ class Signer(ABC):
         self.public_key = 0
 
     def generate_keys(self):
-        # todo ask why here we take from schnorr subgroup and not from Zp
         # todo decide how to pick random
         # self.private_key = random.randrange(int(random_exponent_upper_bound/2), random_exponent_upper_bound)
         self.private_key = random.randrange(0, self.cyclic_group.p)
@@ -110,35 +106,6 @@ class Signer(ABC):
     def verify_message(self, message, signers, R, s):
         pass
 
-
-# class SchnorrSigner(Signer):
-#
-#     def __init__(self, cyclic_group):
-#         super().__init__(cyclic_group)
-#
-#     # The signature is R and s -> (R,s)
-#     def sign_message(self, message):
-#         # random number from cyclic group
-#         r = random.choice(cyclic_group.elements)
-#         R = pow(cyclic_group.generator, r, cyclic_group.p)
-#         c = self.compute_challenge(message, self.public_key, R)
-#         s = r + c * self.private_key
-#         log("Signature", self.object_name, "r: %i\t R: %i\t s: %i", r, R, s)
-#         # todo wywalic X
-#         return self.public_key, R, s
-#
-#     def verify_message(self, message, signers, R, s):
-#         # signer's public key
-#         X = signers[0]
-#
-#         left_side = pow(cyclic_group.generator, s, cyclic_group.p)
-#         c = self.compute_challenge(message, X, R)
-#         right_side = (R * pow(X, c, cyclic_group.p)) % cyclic_group.p
-#
-#         # leftside pow(generator, s, p); rightside (R * pow(X, c, p) )  mod p
-#         log("Verification", self.object_name, "g^s mod p  = %i \t|\t R*X^c mod p = %i \t|\t is equals?: %s", left_side,
-#             right_side, left_side == right_side)
-#         return left_side == right_side
 
 class SignerData:
     def __init__(self):
@@ -196,18 +163,13 @@ class MaxwellSigner(Signer):
         for Ri in Ri_list:
             aggregated_R *= Ri
         c = self.compute_challenge(data.X_aggregated, aggregated_R, message)
-        # todo ask why here I cannot do modulo p
         si = (data.ri + c * data.ai * self.private_key) % self.cyclic_group.q
-        # si = data.ri + c * data.ai * self.private_key
-        log("LOGGGG", self.object_name, "si: %i", si)
         return aggregated_R, si
 
     # Round 3
     # The signature is R and s -> (R,s)
     def sign_message(self, R, si_list):
-        # todo ask why here I cannot do modulo p
         s = sum(si_list) % self.cyclic_group.q
-        # s = sum(si_list)
         return R, s
 
     def verify_message(self, message, L, R, s):
@@ -229,7 +191,6 @@ class MaxwellSigner(Signer):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        # reading message
         message_content = str(sys.argv[1])
 
     ### Setup
@@ -286,8 +247,6 @@ if __name__ == "__main__":
         R, si = signer.calculate_individual_signature(data, Ri_list, message_content)
         si_list.append(si)
 
-    # We can take signature from any signer (R, s)
-    # R, s = users[1].sign_message(R, si_list)
     for signer in users[1:]:
         R, s = signer.sign_message(R, si_list)
     log("Signature", "All signers", "Round 3 finished - Signature generated correctly")
