@@ -12,9 +12,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 
 # variables
 message_content = "Hello W0rld"
-prime_number_upper_bound = 10
-# todo delete if unecessary
-random_exponent_upper_bound = 1000
+prime_number_upper_bound = 10000000
 
 
 def log(phase, subject, message, *args):
@@ -32,8 +30,10 @@ def hash_data(hash_name, *args):
 
 
 # todo we should know the real parameter size like p, q, message size, signature time, verification time, overall runtime
-# todo how bitcoin works with multisignature, generally examples
-# todo maybe security
+# todo try to do everything with mod p in group p
+# todo try to run for different bit number and different and different number of signer
+# todo BLS multisignature is better if there is more than 300 signers but in more practical case 300< better is schnorr multisig, check slides from last year student with number of signer that 300 signers is too much
+
 
 class CyclicGroup:
     def __init__(self):
@@ -44,35 +44,28 @@ class CyclicGroup:
         self.generator = 0
         self.hash_name = "sha256"
 
-    # cyclic prime order q subgroup (Zq,*) from group (Zp,*) based on generating two prime numbers as p = 2q+1 where p and q are primes
+    # cyclic prime order q subgroup (Zq,*) from group (Zp,*) based on generating two prime numbers as p = rq+1 where r=2, p and q are primes
     def generate_prime_order_subgroup(self):
         # prime numbers
-        self.q = sympy.randprime(int(prime_number_upper_bound/2), prime_number_upper_bound)
+        self.q = sympy.randprime(int(prime_number_upper_bound / 2), prime_number_upper_bound)
         self.p = 2 * self.q + 1
         while not sympy.isprime(self.p):
-            self.q = sympy.randprime(int(prime_number_upper_bound/2), prime_number_upper_bound)
+            self.q = sympy.randprime(int(prime_number_upper_bound / 2), prime_number_upper_bound)
             self.p = 2 * self.q + 1
-        log("Setup", self.object_name, "Cyclic group generation - self.q: %i, p: %i", self.q, self.p)
+        log("Setup", self.object_name, "Cyclic group generation - q: %i, p: %i", self.q, self.p)
 
-        # Zp group of integers Z_p*
-        zp = [x for x in range(self.p)]
-        # group without 0
-        zp = zp[1:]
+    def select_generator(self, generate_elements=False):
+        self.generator = 1
+        while self.generator <= 1 or pow(self.generator, self.q, self.p) != 1:
+            self.generator = random.randrange(0, self.p)
+        log("Setup", self.object_name, "generator: %s\t p: %s", self.generator, self.p)
+        if generate_elements:
+            self.elements = sorted([pow(self.generator, i, self.p) for i in range(0, self.q)])
+            log("Setup", self.object_name, "group: %s", self.elements[:25])
 
-        # find all elements in cyclic Zq with prime order self.q group:
-        group = []
-        for integer in zp:
-            potential_element = pow(integer, 2, self.p)
-            group.append(potential_element)
-        self.elements = list(set(group))
 
-    def select_generator(self):
-        generator = 1
-        while generator == 1:
-            generator = random.choice(self.elements)
-        self.generator = generator
-        log("Setup", self.object_name, "generator: %s\t p: %s\t\t group: %s\t", self.generator, self.p, self.elements[:25])
 
+# in schnorr paper they suggest to use schnorr group thats why we implement both in group p and schnorr group
 
 class Signer(ABC):
     signers_number = 0
@@ -85,10 +78,7 @@ class Signer(ABC):
         self.public_key = 0
 
     def generate_keys(self):
-        # todo decide how to pick random
-        # self.private_key = random.randrange(int(random_exponent_upper_bound/2), random_exponent_upper_bound)
-        self.private_key = random.randrange(0, self.cyclic_group.p)
-        # self.private_key = random.randrange(0, self.cyclic_group.q)
+        self.private_key = random.randrange(0, self.cyclic_group.q)
         self.public_key = pow(cyclic_group.generator, self.private_key, cyclic_group.p)
         log("Key generation", self.object_name, "private key: %s, public key: %s", self.private_key, self.public_key)
         return self.public_key
@@ -99,7 +89,7 @@ class Signer(ABC):
         return c
 
     @abstractmethod
-    def sign_message(self, R, si_list):
+    def create_aggregated_multisig(self, R, si_list):
         pass
 
     @abstractmethod
@@ -133,10 +123,7 @@ class MaxwellSigner(Signer):
 
     # Round 2
     def send_hashed_random_value(self, data):
-        # todo decide how to pick random
-        # ri = random.randrange(int(random_exponent_upper_bound/2), random_exponent_upper_bound)
-        ri = random.randrange(0, self.cyclic_group.p)
-        # ri = random.randrange(0, self.cyclic_group.q)
+        ri = random.randrange(0, self.cyclic_group.q)
         Ri = pow(cyclic_group.generator, ri, cyclic_group.p)
         hash_R = hash_data(cyclic_group.hash_name, Ri)
 
@@ -158,20 +145,22 @@ class MaxwellSigner(Signer):
         log("Signature", self.object_name, "Committed values are correct.")
 
     # Round 3
-    def calculate_individual_signature(self, data, Ri_list, message):
+    # The signature is R and s -> (R,s)
+    def sign_message(self, data, Ri_list, message):
         aggregated_R = 1
         for Ri in Ri_list:
             aggregated_R *= Ri
+        # todo here should be 256bit c number
         c = self.compute_challenge(data.X_aggregated, aggregated_R, message)
         si = (data.ri + c * data.ai * self.private_key) % self.cyclic_group.q
         return aggregated_R, si
 
     # Round 3
-    # The signature is R and s -> (R,s)
-    def sign_message(self, R, si_list):
+    def create_aggregated_multisig(self, R, si_list):
         s = sum(si_list) % self.cyclic_group.q
         return R, s
 
+    # Verification
     def verify_message(self, message, L, R, s):
         log("Verification", self.object_name, "Starting verification --------")
         X_aggregated = 1
@@ -244,13 +233,11 @@ if __name__ == "__main__":
     si_list = []
     R, s = 0, 0
     for data, signer in zip(signers_data, users[1:]):
-        R, si = signer.calculate_individual_signature(data, Ri_list, message_content)
+        R, si = signer.sign_message(data, Ri_list, message_content)
         si_list.append(si)
 
-    for signer in users[1:]:
-        R, s = signer.sign_message(R, si_list)
+    R, s = users[1].create_aggregated_multisig(R, si_list)
     log("Signature", "All signers", "Round 3 finished - Signature generated correctly")
-
 
     ### Verification
     result = users[0].verify_message(message_content, L, R, s)
