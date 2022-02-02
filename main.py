@@ -51,22 +51,24 @@ class CyclicGroup:
         self.elements = []
         self.generator = 0
         self.hash_name = "sha256"
+        self.k = 0
 
-    # cyclic prime order q subgroup (Zq,*) from group (Zp,*) based on generating two prime numbers as p = rq+1 where r=2, p and q are primes
+    # subgroup of prime order q (Zq,*) from cyclic group (Zp,*) based on generating two prime numbers as p = kq+1 where p and q are primes
     def generate_prime_order_subgroup(self):
-        # prime numbers
-        self.q = sympy.randprime(int(prime_number_upper_bound / 2), prime_number_upper_bound)
-        self.p = 2 * self.q + 1
+        self.p = -1
         while not sympy.isprime(self.p):
-            self.q = sympy.randprime(int(prime_number_upper_bound / 2), prime_number_upper_bound)
-            self.p = 2 * self.q + 1
-        log("Setup", self.object_name, "Cyclic group generation - q: %i, p: %i", self.q, self.p)
+            self.q = sympy.randprime(int(prime_number_upper_bound / 2**129), prime_number_upper_bound / 2**128)
+            self.k = random.randrange(2, 2**128)
+            self.p = self.k * self.q + 1
+        log("Setup", self.object_name, "Cyclic group generation k: %i q: %i, p: %i", self.k, self.q, self.p)
 
+    # generator is g = h^r mod p only when g != 1
     def select_generator(self, generate_elements=False):
-        self.generator = 1
-        while self.generator <= 1 or pow(self.generator, self.q, self.p) != 1:
-            self.generator = random.randrange(0, self.p)
+        self.generator = pow(random.randrange(0, self.p), self.k, self.p)
+        while self.generator <= 1:
+            self.generator = pow(random.randrange(0, self.p), self.k, self.p)
         log("Setup", self.object_name, "generator: %s\t p: %s", self.generator, self.p)
+
         if generate_elements:
             self.elements = sorted([pow(self.generator, i, self.p) for i in range(0, self.q)])
             log("Setup", self.object_name, "group: %s", self.elements[:25])
@@ -184,8 +186,8 @@ class MaxwellSigner(Signer):
         left_side = pow(cyclic_group.generator, s, cyclic_group.p)
         right_side = (R * pow(X_aggregated, c, cyclic_group.p)) % cyclic_group.p
         # leftside pow(generator, s, p); rightside (R * pow(X, c, p) )  mod p
-        log("Verification", self.object_name, "g^s mod p  = %i \t|\t R*X^c mod p = %i \t|\t is equals?: %s", left_side,
-            right_side, left_side == right_side)
+        log("Verification", self.object_name, "IS EQUALS?: %s \t |\t g^s mod p  = %i \t|\t R*X^c mod p = %i ", left_side == right_side, left_side,
+            right_side)
         return left_side == right_side
 
 
