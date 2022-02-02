@@ -13,8 +13,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 
 # variables
 message_content = "Hello W0rld"
-prime_number_upper_bound = 100_000_000
-number_of_signers = 300
+prime_number_upper_bound = 1000000
+number_of_signers = 10
 
 
 def log(phase, subject, message, *args):
@@ -61,14 +61,28 @@ class CyclicGroup:
             self.p = 2 * self.q + 1
         log("Setup", self.object_name, "Cyclic group generation - q: %i, p: %i", self.q, self.p)
 
-    def select_generator(self, generate_elements=False):
+    def select_generator(self, generate_elements=False, is_schnorr_group=True):
         self.generator = 1
-        while self.generator <= 1 or pow(self.generator, self.q, self.p) != 1:
-            self.generator = random.randrange(0, self.p)
-        log("Setup", self.object_name, "generator: %s\t p: %s", self.generator, self.p)
-        if generate_elements:
-            self.elements = sorted([pow(self.generator, i, self.p) for i in range(0, self.q)])
-            log("Setup", self.object_name, "group: %s", self.elements[:25])
+
+        if is_schnorr_group:
+            while self.generator <= 1 or pow(self.generator, self.q, self.p) != 1:
+                self.generator = random.randrange(0, self.p)
+            if generate_elements:
+                self.elements = sorted([pow(self.generator, i, self.p) for i in range(0, self.q)])
+                log("Setup", self.object_name, "group: %s", self.elements[:25])
+        else:
+            s = set(range(1, self.p))
+            results = []
+            for a in s:
+                g = set()
+                for x in s:
+                    g.add((a ** x) % self.p)
+                if g == s:
+                    self.generator = a
+                    results.append(a)
+                    break
+            log("Setup", self.object_name, "generator: %s\t p: %s", self.generator, self.p)
+            return results
 
 
 # in schnorr paper they suggest to use schnorr group thats why we implement both in group p and schnorr group
@@ -83,8 +97,10 @@ class Signer(ABC):
         self.private_key = 0
         self.public_key = 0
 
-    def generate_keys(self):
-        self.private_key = random.randrange(0, self.cyclic_group.q)
+    def generate_keys(self, is_schnorr_group=True):
+        group_size = self.cyclic_group.q if is_schnorr_group else self.cyclic_group.p
+        print(group_size)
+        self.private_key = random.randrange(0, group_size)
         self.public_key = pow(cyclic_group.generator, self.private_key, cyclic_group.p)
         log("Key generation", self.object_name, "private key: %s, public key: %s", self.private_key, self.public_key)
         return self.public_key
@@ -128,8 +144,11 @@ class MaxwellSigner(Signer):
             data.X_aggregated *= pow(key, ai, self.cyclic_group.p)
 
     # Round 2
-    def send_hashed_random_value(self, data):
-        ri = random.randrange(0, self.cyclic_group.q)
+    def send_hashed_random_value(self, data, is_schnorr_group=True):
+        group_size = self.cyclic_group.q if is_schnorr_group else self.cyclic_group.p
+        print(group_size)
+
+        ri = random.randrange(0, group_size)
         Ri = pow(cyclic_group.generator, ri, cyclic_group.p)
         hash_R = hash_data(cyclic_group.hash_name, Ri)
 
@@ -152,18 +171,24 @@ class MaxwellSigner(Signer):
 
     # Round 3
     # The signature is R and s -> (R,s)
-    def sign_message(self, data, Ri_list, message):
+    def sign_message(self, data, Ri_list, message, is_schnorr_group=True):
         aggregated_R = 1
         for Ri in Ri_list:
             aggregated_R *= Ri
         # todo here should be 256bit c number
         c = self.compute_challenge(data.X_aggregated, aggregated_R, message)
-        si = (data.ri + c * data.ai * self.private_key) % self.cyclic_group.q
+        group_size = self.cyclic_group.q if is_schnorr_group else self.cyclic_group.p
+        print(group_size)
+
+        si = (data.ri + c * data.ai * self.private_key) % group_size
         return aggregated_R, si
 
     # Round 3
-    def create_aggregated_multisig(self, R, si_list):
-        s = sum(si_list) % self.cyclic_group.q
+    def create_aggregated_multisig(self, R, si_list, is_schnorr_group=True):
+        group_size = self.cyclic_group.q if is_schnorr_group else self.cyclic_group.p
+        print(group_size)
+
+        s = sum(si_list) % group_size
         return R, s
 
     # Verification
@@ -193,7 +218,7 @@ if __name__ == "__main__":
     t1 = time.time_ns()
     cyclic_group = CyclicGroup()
     cyclic_group.generate_prime_order_subgroup()
-    cyclic_group.select_generator()
+    cyclic_group.select_generator(is_schnorr_group=False)
     log_time("Setup", t1, time.time_ns())
 
     ### Key generation
@@ -203,7 +228,7 @@ if __name__ == "__main__":
     L = []
     for i in range(number_of_signers):
         signer = MaxwellSigner(cyclic_group)
-        X = signer.generate_keys()
+        X = signer.generate_keys(is_schnorr_group=False)
         users.append(signer)
         # Each user except first one will be signer
         if i != 0:
@@ -227,7 +252,7 @@ if __name__ == "__main__":
     log("Signature", "All signers", "Round 2 started ...")
     ti_list = []
     for data, signer in zip(signers_data, users[1:]):
-        ti = signer.send_hashed_random_value(data)
+        ti = signer.send_hashed_random_value(data, is_schnorr_group=False)
         ti_list.append(ti)
     log("Signature", "All signers", "All signers received comitted hash values ti: %s", str(ti_list))
 
@@ -246,10 +271,10 @@ if __name__ == "__main__":
     si_list = []
     R, s = 0, 0
     for data, signer in zip(signers_data, users[1:]):
-        R, si = signer.sign_message(data, Ri_list, message_content)
+        R, si = signer.sign_message(data, Ri_list, message_content, is_schnorr_group=False)
         si_list.append(si)
 
-    R, s = users[1].create_aggregated_multisig(R, si_list)
+    R, s = users[1].create_aggregated_multisig(R, si_list, is_schnorr_group=False)
     log_time("Signature", t1, time.time_ns())
     log("Signature", "All signers", "Round 3 finished - Signature generated correctly")
 
