@@ -13,8 +13,9 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 
 # variables
 message_content = "Hello W0rld"
-prime_number_upper_bound = 100_000_000_000_000_000
-number_of_signers = 30
+number_of_bits = 256
+prime_number_upper_bound = pow(2, number_of_bits - 1)
+number_of_signers = 300
 
 
 def log(phase, subject, message, *args):
@@ -22,7 +23,8 @@ def log(phase, subject, message, *args):
 
 
 def log_time(phase, t1, t2):
-    log(phase, "TIME-MEASUREMENT", "------------------------   This phase took: %.3f ms    -    in other words: %f s", (t2 - t1) / 1_000_000,
+    log(phase, "TIME-MEASUREMENT", "------------------------   This phase took: %.3f ms    -    in other words: %f s",
+        (t2 - t1) / 1_000_000,
         (t2 - t1) / 1_000_000_000)
 
 
@@ -30,7 +32,7 @@ def hash_data(hash_name, *args):
     hash = hashlib.new(hash_name)
     for arg in args:
         if isinstance(arg, int):
-            hash.update(arg.to_bytes(8, byteorder='big'))
+            hash.update(arg.to_bytes(int(number_of_bits / 8), byteorder='big'))
         else:
             hash.update(arg.encode('utf-8'))
     return int.from_bytes(hash.digest(), 'big')
@@ -212,7 +214,6 @@ if __name__ == "__main__":
         if i != 0:
             L.append(X)
     log_time("Key generation", t1, time.time_ns())
-
 
     ### Signature
     t1 = time.time_ns()
