@@ -155,7 +155,6 @@ class MaxwellSigner(Signer):
         log("Signature", self.object_name, "Committed values are correct.")
 
     # Round 3
-    # The signature is R and s -> (R,s)
     def sign_message(self, data, Ri_list, message):
         aggregated_R = 1
         for Ri in Ri_list:
