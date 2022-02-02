@@ -13,8 +13,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 
 # variables
 message_content = "Hello W0rld"
-prime_number_upper_bound = 100_000_000
-number_of_signers = 300
+prime_number_upper_bound = 100_000_000_000_000_000
+number_of_signers = 30
 
 
 def log(phase, subject, message, *args):
@@ -22,22 +22,21 @@ def log(phase, subject, message, *args):
 
 
 def log_time(phase, t1, t2):
-    log(phase, "TIME-MEASUREMENT", "------------------------   This phase took: %f μs    -    in other words: %f s", (t2 - t1) / 1000,
-        (t2 - t1) / 1000_000_000)
+    log(phase, "TIME-MEASUREMENT", "------------------------   This phase took: %.3f ms    -    in other words: %f s", (t2 - t1) / 1_000_000,
+        (t2 - t1) / 1_000_000_000)
 
 
 def hash_data(hash_name, *args):
     hash = hashlib.new(hash_name)
     for arg in args:
         if isinstance(arg, int):
-            hash.update(arg.to_bytes(1024, byteorder='big'))
+            hash.update(arg.to_bytes(8, byteorder='big'))
         else:
             hash.update(arg.encode('utf-8'))
     return int.from_bytes(hash.digest(), 'big')
 
 
 # todo we should know the real parameter size like p, q, message size, signature time, verification time, overall runtime
-# todo try to do everything with mod p in group p
 # todo try to run for different bit number and different and different number of signer
 # todo BLS multisignature is better if there is more than 300 signers but in more practical case 300< better is schnorr multisig, check slides from last year student with number of signer that 300 signers is too much
 
@@ -126,6 +125,7 @@ class MaxwellSigner(Signer):
         for key in L:
             ai = hash_data(self.cyclic_group.hash_name, str(L), key)
             data.X_aggregated *= pow(key, ai, self.cyclic_group.p)
+        data.X_aggregated = data.X_aggregated % self.cyclic_group.p
 
     # Round 2
     def send_hashed_random_value(self, data):
@@ -156,7 +156,8 @@ class MaxwellSigner(Signer):
         aggregated_R = 1
         for Ri in Ri_list:
             aggregated_R *= Ri
-        # todo here should be 256bit c number
+        aggregated_R = aggregated_R % self.cyclic_group.p
+
         c = self.compute_challenge(data.X_aggregated, aggregated_R, message)
         si = (data.ri + c * data.ai * self.private_key) % self.cyclic_group.q
         return aggregated_R, si
@@ -173,6 +174,8 @@ class MaxwellSigner(Signer):
         for key in L:
             ai = hash_data(self.cyclic_group.hash_name, str(L), key)
             X_aggregated *= pow(key, ai, self.cyclic_group.p)
+
+        X_aggregated = X_aggregated % self.cyclic_group.p
         c = self.compute_challenge(X_aggregated, R, message)
 
         log("Verification", self.object_name, "This is value of final s: %i", s)
