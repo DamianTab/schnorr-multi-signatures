@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 message_content = "Hello W0rld"
 number_of_bits = 256
 prime_number_upper_bound = pow(2, number_of_bits - 1)
-number_of_signers = 300
+number_of_signers = 30
 
 
 def log(phase, subject, message, *args):
@@ -37,11 +37,6 @@ def hash_data(hash_name, *args):
             hash.update(arg.encode('utf-8'))
     return int.from_bytes(hash.digest(), 'big')
 
-
-# todo we should know the real parameter size like p, q, message size, signature time, verification time, overall runtime
-# todo try to run for different bit number and different and different number of signer
-# todo BLS multisignature is better if there is more than 300 signers but in more practical case 300< better is schnorr multisig, check slides from last year student with number of signer that 300 signers is too much
-# todo in schnorr paper they suggest to use schnorr group thats why we implement both in group p and schnorr group
 
 class CyclicGroup:
     def __init__(self):
