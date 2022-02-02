@@ -57,8 +57,8 @@ class CyclicGroup:
     def generate_prime_order_subgroup(self):
         self.p = -1
         while not sympy.isprime(self.p):
-            self.q = sympy.randprime(int(prime_number_upper_bound / 2**129), prime_number_upper_bound / 2**128)
-            self.k = random.randrange(2, 2**128)
+            self.q = sympy.randprime(int(prime_number_upper_bound / 2 ** 129), prime_number_upper_bound / 2 ** 128)
+            self.k = random.randrange(2, 2 ** 128)
             self.p = self.k * self.q + 1
         log("Setup", self.object_name, "Cyclic group generation k: %i q: %i, p: %i", self.k, self.q, self.p)
 
@@ -72,7 +72,6 @@ class CyclicGroup:
         if generate_elements:
             self.elements = sorted([pow(self.generator, i, self.p) for i in range(0, self.q)])
             log("Setup", self.object_name, "group: %s", self.elements[:25])
-
 
 
 class Signer(ABC):
@@ -184,7 +183,8 @@ class MaxwellSigner(Signer):
         left_side = pow(cyclic_group.generator, s, cyclic_group.p)
         right_side = (R * pow(X_aggregated, c, cyclic_group.p)) % cyclic_group.p
         # leftside pow(generator, s, p); rightside (R * pow(X, c, p) )  mod p
-        log("Verification", self.object_name, "IS EQUALS?: %s \t |\t g^s mod p  = %i \t|\t R*X^c mod p = %i ", left_side == right_side, left_side,
+        log("Verification", self.object_name, "IS EQUALS?: %s \t |\t g^s mod p  = %i \t|\t R*X^c mod p = %i ",
+            left_side == right_side, left_side,
             right_side)
         return left_side == right_side
 
