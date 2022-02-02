@@ -41,7 +41,7 @@ def hash_data(hash_name, *args):
 # todo we should know the real parameter size like p, q, message size, signature time, verification time, overall runtime
 # todo try to run for different bit number and different and different number of signer
 # todo BLS multisignature is better if there is more than 300 signers but in more practical case 300< better is schnorr multisig, check slides from last year student with number of signer that 300 signers is too much
-
+# todo in schnorr paper they suggest to use schnorr group thats why we implement both in group p and schnorr group
 
 class CyclicGroup:
     def __init__(self):
@@ -74,7 +74,6 @@ class CyclicGroup:
             log("Setup", self.object_name, "group: %s", self.elements[:25])
 
 
-# in schnorr paper they suggest to use schnorr group thats why we implement both in group p and schnorr group
 
 class Signer(ABC):
     signers_number = 0
