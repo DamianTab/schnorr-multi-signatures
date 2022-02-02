@@ -2,6 +2,7 @@ import hashlib
 import logging
 import random
 import sys
+import time
 from abc import ABC, abstractmethod
 from random import SystemRandom  # cryptographic random byte generator
 
@@ -12,18 +13,24 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s | %(levelname)s | %
 
 # variables
 message_content = "Hello W0rld"
-prime_number_upper_bound = 10000000
+prime_number_upper_bound = 100_000_000
+number_of_signers = 300
 
 
 def log(phase, subject, message, *args):
     logging.debug(" OBJECT: %-22s |\t PHASE: %-23s | \t" + message, subject, phase, *args)
 
 
+def log_time(phase, t1, t2):
+    log(phase, "TIME-MEASUREMENT", "------------------------   This phase took: %f μs    -    in other words: %f s", (t2 - t1) / 1000,
+        (t2 - t1) / 1000_000_000)
+
+
 def hash_data(hash_name, *args):
     hash = hashlib.new(hash_name)
     for arg in args:
         if isinstance(arg, int):
-            hash.update(arg.to_bytes(24, byteorder='big'))
+            hash.update(arg.to_bytes(1024, byteorder='big'))
         else:
             hash.update(arg.encode('utf-8'))
     return int.from_bytes(hash.digest(), 'big')
@@ -64,7 +71,6 @@ class CyclicGroup:
             log("Setup", self.object_name, "group: %s", self.elements[:25])
 
 
-
 # in schnorr paper they suggest to use schnorr group thats why we implement both in group p and schnorr group
 
 class Signer(ABC):
@@ -85,7 +91,7 @@ class Signer(ABC):
 
     def compute_challenge(self, X, R, message):
         c = hash_data(self.cyclic_group.hash_name, X, R, message)
-        log("---", self.object_name, "c= %i", c)
+        # log("---", self.object_name, "c= %i", c)
         return c
 
     @abstractmethod
@@ -181,25 +187,32 @@ class MaxwellSigner(Signer):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         message_content = str(sys.argv[1])
+        number_of_signers = str(sys.argv[2])
 
     ### Setup
+    t1 = time.time_ns()
     cyclic_group = CyclicGroup()
     cyclic_group.generate_prime_order_subgroup()
     cyclic_group.select_generator()
+    log_time("Setup", t1, time.time_ns())
 
     ### Key generation
+    t1 = time.time_ns()
     users = []
     # List of signers' public keys
     L = []
-    for i in range(5):
+    for i in range(number_of_signers):
         signer = MaxwellSigner(cyclic_group)
         X = signer.generate_keys()
         users.append(signer)
         # Each user except first one will be signer
         if i != 0:
             L.append(X)
+    log_time("Key generation", t1, time.time_ns())
+
 
     ### Signature
+    t1 = time.time_ns()
     signers_data = []
 
     # Round 1
@@ -237,7 +250,10 @@ if __name__ == "__main__":
         si_list.append(si)
 
     R, s = users[1].create_aggregated_multisig(R, si_list)
+    log_time("Signature", t1, time.time_ns())
     log("Signature", "All signers", "Round 3 finished - Signature generated correctly")
 
     ### Verification
+    t1 = time.time_ns()
     result = users[0].verify_message(message_content, L, R, s)
+    log_time("Verification", t1, time.time_ns())
