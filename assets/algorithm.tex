@@ -1,0 +1,88 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\begin{document}
+
+\begin{algorithm}
+	\caption{Setup}
+	\begin{algorithmic}[1]
+	    \State $q$ - random prime, $k$ - random number
+	    \State $p = kq +1$ that p is prime number
+	    \State generator $g = h^{k} \pmod{p}$, h is random number and $h^{k} \neq 1 \pmod{p}$
+	    \State \textbf{Output:} $q, p, g$
+	\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+	\caption{Key Generation}
+	\begin{algorithmic}[1]
+	    \State \textbf{Input:} $p, q$
+	    \State private key - $x \in (0, p)$
+	    \State public key - $X = g^{x} \pmod{p}$
+	    \State \textbf{Output:} $(x, X)$
+	\end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+	\caption{Signature round 1}
+	\begin{algorithmic}[1]
+	    \State \textbf{Input:} $L = ( X_0, …, X_n)$
+	    \For {$signer=1,2,\ldots,N$}
+	        \State $a_i = H_{agg}(L, X_i)$
+	        \State $ \tilde{X} = \prod_{i=1}^{n} X^{ai}_i $
+	    \EndFor
+	    \State \textbf{Output:} $\tilde{X}$
+	\end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+	\caption{Signature round 2}
+	\begin{algorithmic}[1]
+	    \State \textbf{Input:} $p, q$
+	    \For {$signer=1,2,\ldots,N$}
+	        \State $r_i \in (0, q)$
+	        \State $R_i= g^{r_i} \pmod{p}$
+	        \State Send to every signer $t_i = H_{com}(R_i)$
+	    \EndFor
+	    \For {$signer=1,2,\ldots,N$}
+	        \State Send to every signer $R_i$
+	    \EndFor
+	    \For {$signer=1,2,\ldots,N$}
+            \State If $t_i = H_{com} (R_i)$ true then continue, else abort.
+	    \EndFor
+	\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+	\caption{Signature round 3}
+	\begin{algorithmic}[1]
+	    \State \textbf{Input:} $L = ( X_0, …, X_n)$, $\tilde{X}, r_i, a_i, x_i, p, q, m$
+	    \For {$signer=1,2,\ldots,N$}
+	        \State $R = \prod_{i=1}^{n} R_i $
+	        \State $c = H_{sig}(\tilde{X}, R,  m)$
+	        \State $s_i = r_i + ca_ix_i \pmod{q}$
+	    \EndFor
+	    \State $s = \sum_{i=1}^{n} s_i \pmod{q}$
+	    \State \textbf{Output:} $\sigma = (R, s)$
+	\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+	\caption{Verification}
+	\begin{algorithmic}[1]
+        \State \textbf{Input:} $L = ( X_0, …, X_n)$, $R, s, m, p $
+        \State Verifier performs:
+        \For {$signer=1,2,\ldots,N$}
+            \State $a_i = H_{agg}(L, X_i)$
+	    \EndFor
+	    \State $ \tilde{X} = \prod_{i=1}^{n} X^{ai}_i $
+	    \State $c = H_{sig}(\tilde{X}, R,  m)$
+	    \State \textbf{Output:} if $g^{s} = R\tilde{X}^c \pmod{p}$ then true else false
+	\end{algorithmic}
+\end{algorithm}
+
+
+
+\end{document}
