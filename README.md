@@ -153,7 +153,7 @@ It is possible to change number of bits for prime numbers, but it is highly disc
 <br/>
 
 ## 🚀 Deployment <a name = "deployment"></a>
-No availab  le deployment method.
+No available deployment method.
 
 <br/>
 
